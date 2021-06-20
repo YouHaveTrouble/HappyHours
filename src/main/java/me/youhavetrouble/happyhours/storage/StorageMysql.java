@@ -7,7 +7,7 @@ import java.sql.*;
 public class StorageMysql implements Storage {
 
     Connection connection;
-    public static final String INSERT_ENTRY = "INSERT OR IGNORE INTO `HappyHours` (id) VALUES (?)";
+    public static final String INSERT_ENTRY = "INSERT IGNORE INTO `HappyHours` (id) VALUES (?);";
     public static final String UPDATE_TIME = "UPDATE `HappyHours` SET endTimestamp=? WHERE id=?;";
     public static final String LOAD_TIME = "SELECT endTimestamp FROM `HappyHours` WHERE `id`=?;";
 

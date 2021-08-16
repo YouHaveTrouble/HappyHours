@@ -1,6 +1,8 @@
 name: HappyHours
 version: ${project.version}
 main: me.youhavetrouble.happyhours.HappyHours
-api-version: 1.16
+api-version: 1.13
 authors: [ YouHaveTrouble ]
 website: youhavetrouble.me
+database: true
+load: STARTUP

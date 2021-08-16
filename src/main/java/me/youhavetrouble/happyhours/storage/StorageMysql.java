@@ -3,12 +3,12 @@ package me.youhavetrouble.happyhours.storage;
 import org.bukkit.NamespacedKey;
 
 import java.sql.*;
+import java.util.concurrent.CompletableFuture;
 
 public class StorageMysql implements Storage {
 
     Connection connection;
-    public static final String INSERT_ENTRY = "INSERT IGNORE INTO `HappyHours` (id) VALUES (?);";
-    public static final String UPDATE_TIME = "UPDATE `HappyHours` SET endTimestamp=? WHERE id=?;";
+    public static final String INSERT_ENTRY = "INSERT INTO `HappyHours` (id, endTimestamp) VALUES (?, ?) ON DUPLICATE KEY UPDATE endTimestamp = ?;";
     public static final String LOAD_TIME = "SELECT endTimestamp FROM `HappyHours` WHERE `id`=?;";
 
     public StorageMysql(String url) throws SQLException {
@@ -23,7 +23,7 @@ public class StorageMysql implements Storage {
         try {
             if (connection != null) {
                 Statement statement = connection.createStatement();
-                String sql = "CREATE TABLE IF NOT EXISTS `HappyHours` (`id` varchar(128) UNIQUE PRIMARY KEY, `endTimestamp` long DEFAULT '0');";
+                String sql = "CREATE TABLE IF NOT EXISTS `HappyHours` (`id` varchar(128) UNIQUE PRIMARY KEY, `endTimestamp` long);";
                 statement.execute(sql);
             }
         } catch (SQLException e) {
@@ -31,47 +31,36 @@ public class StorageMysql implements Storage {
         }
     }
 
-    private void createEntry(NamespacedKey key) {
-        try {
-            PreparedStatement insertnew = connection.prepareStatement(INSERT_ENTRY);
-            insertnew.setString(1, key.asString());
-            insertnew.executeUpdate();
-        } catch (SQLException e) {
-            if (e.getErrorCode() != 19) {
+    public CompletableFuture<Void> updateEntry(NamespacedKey key, long timestamp) {
+        return CompletableFuture.runAsync(() -> {
+            try {
+                PreparedStatement statement = connection.prepareStatement(INSERT_ENTRY);
+                statement.setString(1, key.asString());
+                statement.setLong(2, timestamp);
+                statement.setLong(3, timestamp);
+                statement.executeUpdate();
+            } catch (SQLException e) {
                 e.printStackTrace();
             }
-        }
+        });
     }
 
     @Override
-    public void updateEntry(NamespacedKey key, long timestamp) {
-        createEntry(key);
-        try {
-            PreparedStatement update = connection.prepareStatement(UPDATE_TIME);
-            update.setLong(1, timestamp);
-            update.setString(2, key.asString());
-            update.executeUpdate();
-        } catch (SQLException e) {
-            if (e.getErrorCode() != 19) {
-                e.printStackTrace();
+    public CompletableFuture<Long> getEntry(NamespacedKey key) {
+        return CompletableFuture.supplyAsync(() -> {
+            try {
+                PreparedStatement loaduser = connection.prepareStatement(LOAD_TIME);
+                loaduser.setString(1, key.asString());
+                ResultSet result = loaduser.executeQuery();
+                if (result.next()) {
+                    return result.getLong("endTimestamp");
+                }
+                return 0L;
+            } catch (SQLException throwables) {
+                throwables.printStackTrace();
+                return 0L;
             }
-        }
-    }
+        });
 
-    @Override
-    public long getEntry(NamespacedKey key) {
-        try {
-            createEntry(key);
-            PreparedStatement loaduser = connection.prepareStatement(LOAD_TIME);
-            loaduser.setString(1, key.asString());
-            ResultSet result = loaduser.executeQuery();
-            if (result.next()) {
-                return result.getLong("endTimestamp");
-            }
-            return 0;
-        } catch (SQLException throwables) {
-            throwables.printStackTrace();
-            return 0;
-        }
     }
 }

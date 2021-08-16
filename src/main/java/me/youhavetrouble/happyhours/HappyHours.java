@@ -9,16 +9,15 @@ import org.bukkit.plugin.java.JavaPlugin;
 import java.sql.SQLException;
 import java.time.Instant;
 import java.util.HashMap;
+import java.util.concurrent.CompletableFuture;
 
 public final class HappyHours extends JavaPlugin {
 
     private static final HashMap<NamespacedKey, HappyHour> events = new HashMap<>();
     private static Storage storage;
-    private static HappyHours instance;
 
     @Override
     public void onEnable() {
-        instance = this;
         saveDefaultConfig();
         reloadConfig();
         try {
@@ -33,24 +32,26 @@ public final class HappyHours extends JavaPlugin {
         return events.get(key);
     }
 
-    public static NamespacedKey registerTimedEvent(String name, JavaPlugin plugin) {
+    /**
+     * Register the event to cache it.
+     * @param name Unique identifier for the event
+     * @param plugin Plugin owning the event
+     * @return CompletableFuture of NamespacedKey that will be used as key to access the event from getHappyHour()
+     */
+    public static CompletableFuture<NamespacedKey> registerTimedEvent(String name, JavaPlugin plugin) {
         HappyHour happyHour = new HappyHour(name, plugin, 0);
         NamespacedKey key = happyHour.getNamespacedKey();
-        long timestamp = storage.getEntry(key);
-        long now = Instant.now().getEpochSecond();
-        if (now < timestamp)
-            happyHour.AddActiveTime(timestamp-now);
-        events.putIfAbsent(key, happyHour);
-        return key;
+        return storage.getEntry(key).thenApplyAsync(timestamp -> {
+            long now = Instant.now().getEpochSecond();
+            if (now < timestamp)
+                happyHour.AddActiveTime(timestamp-now);
+            events.putIfAbsent(key, happyHour);
+            return key;
+        });
     }
 
     protected static Storage getStorage() {
         return storage;
     }
-
-    public static HappyHours getInstance() {
-        return instance;
-    }
-
 
 }
